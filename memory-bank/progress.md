@@ -2,59 +2,36 @@
 
 ## Current state
 
-Milestone 5 Part 2 inventory backoffice UI is implemented in `uis/web`. Phase guide remains at root [`Backoffice-Inventory-Interface-Context.md`](../Backoffice-Inventory-Interface-Context.md) until the iteration is archived.
-
-## Completed (this iteration)
-
-- `uis/web/src/lib/inventory.ts`: types, `stockStatus`, `InsufficientStockError`, list/get/create/listMovements.
-- `apiFetch` rethrows caller abort; timeout abort still maps to `ApiTimeoutError`.
-- Four protected pages + inventory components + Inventory nav link + `?supply_id=` preselect.
-- Jest: `inventory.test.ts`, `inventoryViews.test.tsx`, abort cases in `apiClient.test.ts`.
-- Local `uis/web/.env.local` copied from `.env.example` (gitignored; `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`).
+On `telemetry-capture`. Capture stub + `track()` queue implemented. Next after commit: storage plan on `telemetry-storage`.
 
 ## Completed (standing)
 
-- Public site, staff UI, incident CLI, supplier directory, staff JWT auth, error handling, bullet-proof tests, inventory API (HCR-0188).
+- Public site, staff UI, incident CLI, supplier directory, staff JWT auth, error handling, bullet-proof tests, inventory API, inventory UI, Compose, Web Vitals, serialization, caching.
+- Telemetry capture (this branch): `POST /telemetry/events` stub; HealthCore catalogue in `docs/telemetry/`; staff `track()` with batch/beacon/retry.
 
 ## Validation results
 
-HCR-0188 (2026-09-18): 16 inventory pytest passed; 96 full pytest; compileall ok; live seed 6/4/3 gloves 105; live `/docs` + HTTP smoke of evaluator-critical flows. Details in [`TESTING.md`](../TESTING.md).
+- `uv run pytest` — **118 passed** (2026-09-30).
+- `npm test -w uis/web` focused (telemetry/inventoryViews/apiClient/lazyPages) — **26 passed**.
+- `npm run typecheck -w uis/web` and lint — pass.
 
-Part 2 (2026-09-18):
-
-- `npm test -w uis/web`: 34 passed, 3 suites (coverage on `apiClient.ts` + `inventory.ts`).
-- `npm run lint -w uis/web`: no ESLint warnings or errors.
-- `npm run build -w uis/web`: success; routes include the four `/backoffice/inventory/...` pages.
-- `npm run typecheck -w uis/web`: passed after abort-mock `RequestInit` typing fix (an earlier run failed only because a concurrent `next build` had wiped `.next/types`).
-- Live smoke (API `:8000`, web `:3001`): unauthenticated `/backoffice/inventory/products` → `/login`; registered staff user; supplies list showed live stock (gloves **105 box / In stock**, wound care humanized); delivery of 2 succeeded and stock became **107**; consumption loaded **107**, overstock warning blocked qty 200; stale-stock submit of 107 after a concurrent outbound 1 returned inline `Insufficient stock for supply 'Nitrile gloves (box of 100)'. Available: 106, requested: 107.` and refreshed stock; successful consumption of 1; history showed Delivery (inbound), Clinical use (outbound), Expiry waste (outbound), `en-GB` dates, `user_uuid`, no edit/delete.
+Unverified: headed DevTools batch screenshot against `next start`.
 
 ## Blockers
 
-- None for Part 2. Supabase MCP SQL still fails password auth; live checks used SQLAlchemy via `.env`.
-
-## Unverified / observed
-
-- Pre-existing AuthGuard hydration overlay (`src/components/AuthProvider.tsx`) appears on hard navigations in Next 15.2.4; dismissed with Escape and did not block the inventory flows. Not fixed in this iteration.
+None.
 
 ## Next steps
 
-1. User review / evaluator pass; archive this iteration when asked.
+1. Commit `telemetry-capture` (requested by sprint overview).
+2. Storage phase plan, then implement.
 
 ## Run commands (durable)
 
 ```bash
-cd services/api
-uv sync --group dev
-uv run pytest
-uv run seed-auth
-uv run seed-inventory
-uv run uvicorn app.main:app --reload --port 8000
-
+cd services/api && uv run pytest
 npm test -w uis/web
-npm run typecheck -w uis/web
-npm run lint -w uis/web
-npm run build -w uis/web
-npm run dev -w uis/web
+npm run typecheck
 ```
 
-Last updated: 2026-09-18
+Last updated: 2026-09-30
