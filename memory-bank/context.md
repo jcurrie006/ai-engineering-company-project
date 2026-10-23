@@ -2,21 +2,14 @@
 
 ## Goal
 
-Milestone 5 Part 2: authenticated backoffice inventory views in `uis/web`, talking only to the Part 1 `/inventory` API. Phase guide: root [`Backoffice-Inventory-Interface-Context.md`](../Backoffice-Inventory-Interface-Context.md).
-
-## Scope (this iteration)
-
-- Four protected routes under `/backoffice/inventory/...` in `uis/web` (App Router, port 3001).
-- Dedicated `uis/web/src/lib/inventory.ts` client (JWT via existing `apiFetch`; no page-level `fetch`).
-- Presentation-only stock badges; official stock comes from the API.
-- Do **not** change the inventory backend unless a live contract bug is proven.
-- Do **not** add catalogue create/edit/delete UI, history edit/delete, search/pagination, auth redesign, or PHI.
+Standing HealthCore Digital work. Data-pipeline sprints 1–3 are archived — do not load [`archive/2026-10-21-data-pipeline/`](archive/2026-10-21-data-pipeline/) unless asked. Durable notes: [`implementation-memory/clinic-supply-pipeline.md`](implementation-memory/clinic-supply-pipeline.md). Telemetry is archived.
 
 ## Scope (standing)
 
-- Keep shipped UIs runnable: `uis/website` (public), `uis/web` (staff JWT).
+- Keep shipped UIs runnable: `uis/website` (public), `uis/web` (staff JWT, including inventory).
 - Phase 1 incident CLI: [`scripts/`](../scripts/).
-- Phase 2 API: incidents, suppliers, staff JWT auth, inventory.
+- Phase 2 API: incidents, suppliers, staff JWT auth, inventory, telemetry.
+- Local stack: `docker compose up` starts website (3000), staff UI (3001), and FastAPI (8000).
 - Treat [`docs/architecture_proposal.md`](../docs/architecture_proposal.md) as the blueprint before expanding beyond Phase 2.
 - Do **not** invent production PHI flows or EHR integrations without explicit instruction.
 
@@ -28,23 +21,28 @@ Milestone 5 Part 2: authenticated backoffice inventory views in `uis/web`, talki
 - HIPAA (US) / UK GDPR apply to any patient-adjacent data handling.
 - User/Profile stay in TinyDB only (`services/api/data/auth.json`). Do not add User/Profile tables in Postgres/Supabase.
 - No commit/push/PR unless the user requests it.
-- Treat implementation and validation as one task (see spec). Do not rewrite `memory-bank/archive/`.
-- Work lives in `uis/web`, not `uis/backoffice`.
+- Treat implementation and validation as one task (see spec).
+- Do not rewrite error handlers, replace FastAPI/Pydantic/SQLModel/TinyDB, or create a new backend.
+- Do not rewrite `memory-bank/archive/`. Leave `services/api/.coverage` untracked.
 
 ## Essential background
 
 HealthCore: 12 outpatient clinics (US + UK), ~200 staff, ~$28M revenue.
 
-Completed iterations (do not load unless asked): `archive/2026-07-29-monorepo-ai-frontend/`, `archive/2026-08-28-supplier-directory/`, `archive/2026-08-28-staff-auth/`, `archive/2026-08-31-error-handling/`, `archive/2026-09-04-bullet-proof/`, `archive/2026-09-18-inventory-api/`.
+Staff UI is `uis/web` (port 3001), not `uis/backoffice`. FastAPI lives at `services/api`. Browser API calls use `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`. The public website and `scripts/` do not call this HTTP API.
+
+Completed iterations (do not load unless asked): `archive/2026-07-29-monorepo-ai-frontend/`, `archive/2026-08-28-supplier-directory/`, `archive/2026-08-28-staff-auth/`, `archive/2026-08-31-error-handling/`, `archive/2026-09-04-bullet-proof/`, `archive/2026-09-18-inventory-api/`, `archive/2026-09-18-inventory-backoffice-ui/`, `archive/2026-09-23-docker-compose/`, `archive/2026-09-23-web-vitals/`, `archive/2026-09-24-serialization/`, `archive/2026-09-30-caching-optimisation/`, `archive/2026-10-14-telemetry/`, `archive/2026-10-21-data-pipeline/`.
 
 ## Relevant files
 
 | Path | Role |
 |------|------|
-| `Backoffice-Inventory-Interface-Context.md` | Part 2 phase guide |
-| `uis/web/src/lib/inventory.ts` | Inventory types + `apiFetch` helpers |
-| `uis/web/src/lib/apiClient.ts` | JWT, timeout vs caller abort |
-| `uis/web/src/components/inventory/` | Supplies list, delivery, consumption, history |
-| `uis/web/src/app/(protected)/backoffice/inventory/` | Four App Router pages |
-| `memory-bank/implementation-memory/inventory-api.md` | Durable HCR-0188 notes |
-| `TESTING.md` | Test commands including HCR-0188 |
+| `data/pipelines/PIPELINE_DESIGN.md` | Monthly clinic supply performance design |
+| `data/pipelines/pipeline.py` | Clinic supply ETL (Prefect 3) |
+| `docs/telemetry/` | Shipped telemetry plans, schemas, SQL |
+| `CACHING_REPORT.md` | Caching investigation trail (keep at repo root) |
+| `docs/serialization-audit.md` | FastAPI response contracts |
+| `docs/architecture_proposal.md` | Future backend blueprint |
+| `services/api/app/main.py` | FastAPI entry |
+| `uis/web/` | Staff JWT app |
+| `uis/website/` | Public site |

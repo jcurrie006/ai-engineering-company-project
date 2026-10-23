@@ -9,6 +9,7 @@ const nav = [
   { href: "/operations", label: "Operations analytics" },
   { href: "/incidents", label: "Incident analysis" },
   { href: "/backoffice/inventory/products", label: "Inventory" },
+  { href: "/backoffice/reporting/monthly-clinic-supply-performance", label: "Clinic supply report" },
   { href: "/suppliers", label: "Supplier directory" },
   { href: "/account/profile", label: "Profile" },
   { href: "/account/change-password", label: "Change password" },
@@ -48,7 +49,7 @@ export function BackofficeShell({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-3 text-sm">
             <span className="text-slate-600">
               {displayName}
-              {user ? <span className="text-slate-400"> · {user.role}</span> : null}
+              {user ? <span className="text-slate-600"> · {user.role}</span> : null}
             </span>
             <button
               type="button"
