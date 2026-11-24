@@ -2,21 +2,24 @@
 
 ## Goal
 
-Milestone 5 Part 2: authenticated backoffice inventory views in `uis/web`, talking only to the Part 1 `/inventory` API. Phase guide: root [`Backoffice-Inventory-Interface-Context.md`](../Backoffice-Inventory-Interface-Context.md).
+Add a fail-closed protection harness around the Part 1 staff agent so it serves as the HealthCore compliance assistant. Check each turn before RAG, MCP, answer generation, and memory side effects. Release every answer through one output check. The handoff is archived at [`archive/2026-11-18-agent-gaurdrails/agent-gaurdrails-context.md`](archive/2026-11-18-agent-gaurdrails/agent-gaurdrails-context.md). Part 1 memory stays as built.
 
 ## Scope (this iteration)
 
-- Four protected routes under `/backoffice/inventory/...` in `uis/web` (App Router, port 3001).
-- Dedicated `uis/web/src/lib/inventory.ts` client (JWT via existing `apiFetch`; no page-level `fetch`).
-- Presentation-only stock badges; official stock comes from the API.
-- Do **not** change the inventory backend unless a live contract bug is proven.
-- Do **not** add catalogue create/edit/delete UI, history edit/delete, search/pagination, auth redesign, or PHI.
+- Screen `POST /agent/query` before memory confirmation, retrieval, and the incident tool. Restricted turns return a fixed template and do not call those downstream steps.
+- Keep the Part 1 contract: `{ "answer", "run_id", "conversation_id", "memory_proposal" }`, user-owned confirm-before-save, and the memory privacy gate.
+- Use an agent-only compliance system message. `POST /knowledge/query` keeps the coordinator prompt and its current contract. The staff page calls the agent.
+- Do not add compliance policy documents. Missing evidence tells staff to contact Compliance. Tests use labeled synthetic fixtures.
+- Durable checkpoints and traces still omit question and answer text, and they no longer store an incident id.
+- Record sanitized block and redirect events. A local command prints session counts. No new HTTP report route.
 
 ## Scope (standing)
 
-- Keep shipped UIs runnable: `uis/website` (public), `uis/web` (staff JWT).
+- Keep shipped UIs runnable: `uis/website` (public), `uis/web` (staff JWT, including inventory).
 - Phase 1 incident CLI: [`scripts/`](../scripts/).
-- Phase 2 API: incidents, suppliers, staff JWT auth, inventory.
+- Phase 2 API: incidents, suppliers, staff JWT auth, inventory, telemetry, reporting, Celery queue.
+- Sales forecast CLI: [`scripts/train_sales_forecast.py`](../scripts/train_sales_forecast.py) and [`scripts/eval_sales_forecast.py`](../scripts/eval_sales_forecast.py) (isolated `scripts/sales_forecast` uv env).
+- Local stack: `docker compose up` starts website (3000), staff UI (3001), FastAPI (8000), Redis (6379), worker, Flower (5555).
 - Treat [`docs/architecture_proposal.md`](../docs/architecture_proposal.md) as the blueprint before expanding beyond Phase 2.
 - Do **not** invent production PHI flows or EHR integrations without explicit instruction.
 
@@ -26,25 +29,29 @@ Milestone 5 Part 2: authenticated backoffice inventory views in `uis/web`, talki
 - Milestone 1 static archives and Milestone 2 `src/types/**`, `src/utils/**` — import/reference only until instructed.
 - APIs live only under `services/`.
 - HIPAA (US) / UK GDPR apply to any patient-adjacent data handling.
-- User/Profile stay in TinyDB only (`services/api/data/auth.json`). Do not add User/Profile tables in Postgres/Supabase.
+- User/Profile stay in TinyDB only (`services/api/data/auth.json`).
 - No commit/push/PR unless the user requests it.
-- Treat implementation and validation as one task (see spec). Do not rewrite `memory-bank/archive/`.
-- Work lives in `uis/web`, not `uis/backoffice`.
+- Treat implementation and validation as one task (see spec).
+- Do not rewrite `memory-bank/archive/`. Leave `services/api/.coverage` untracked.
+- Celery module is `app.celery_app`. Do not `load_dotenv` at Celery import time.
+- Do not add sales-forecast training libraries (`scikit-learn`, `scipy`, `matplotlib`) to `services/api/pyproject.toml` or `scripts/requirements.txt`. The API project may include the Qdrant client, LangGraph, and the SQLite checkpoint package, mirrored in `services/api/requirements.txt`. Do not add those libraries to `scripts/requirements.txt`.
 
 ## Essential background
 
 HealthCore: 12 outpatient clinics (US + UK), ~200 staff, ~$28M revenue.
 
-Completed iterations (do not load unless asked): `archive/2026-07-29-monorepo-ai-frontend/`, `archive/2026-08-28-supplier-directory/`, `archive/2026-08-28-staff-auth/`, `archive/2026-08-31-error-handling/`, `archive/2026-09-04-bullet-proof/`, `archive/2026-09-18-inventory-api/`.
+Staff UI is `uis/web` (port 3001), not `uis/backoffice`. FastAPI lives at `services/api`. Browser API calls use `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`.
+
+Completed iterations (do not load unless asked): `archive/2026-07-29-monorepo-ai-frontend/` through `archive/2026-11-18-agent-gaurdrails/`.
 
 ## Relevant files
 
 | Path | Role |
 |------|------|
-| `Backoffice-Inventory-Interface-Context.md` | Part 2 phase guide |
-| `uis/web/src/lib/inventory.ts` | Inventory types + `apiFetch` helpers |
-| `uis/web/src/lib/apiClient.ts` | JWT, timeout vs caller abort |
-| `uis/web/src/components/inventory/` | Supplies list, delivery, consumption, history |
-| `uis/web/src/app/(protected)/backoffice/inventory/` | Four App Router pages |
-| `memory-bank/implementation-memory/inventory-api.md` | Durable HCR-0188 notes |
-| `TESTING.md` | Test commands including HCR-0188 |
+| `CONTEXT.md` | Canonical company briefing |
+| `docs/architecture_proposal.md` | Backend blueprint |
+| `memory-bank/implementation-memory/index.md` | Durable implementation catalog |
+| `archive/2026-11-13-agent-memory/agent-memory-context.md` | Archived agent-memory handoff |
+| `archive/2026-11-18-agent-gaurdrails/agent-gaurdrails-context.md` | Archived harness handoff |
+| `services/api/app/agent/` | Support agent, harness, privacy gate, and memory store |
+| `uis/web/src/components/KnowledgeAssistant.tsx` | Staff entry for the compliance agent |

@@ -2,59 +2,82 @@
 
 ## Current state
 
-Milestone 5 Part 2 inventory backoffice UI is implemented in `uis/web`. Phase guide remains at root [`Backoffice-Inventory-Interface-Context.md`](../Backoffice-Inventory-Interface-Context.md) until the iteration is archived.
-
-## Completed (this iteration)
-
-- `uis/web/src/lib/inventory.ts`: types, `stockStatus`, `InsufficientStockError`, list/get/create/listMovements.
-- `apiFetch` rethrows caller abort; timeout abort still maps to `ApiTimeoutError`.
-- Four protected pages + inventory components + Inventory nav link + `?supply_id=` preselect.
-- Jest: `inventory.test.ts`, `inventoryViews.test.tsx`, abort cases in `apiClient.test.ts`.
-- Local `uis/web/.env.local` copied from `.env.example` (gitignored; `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000`).
+Working branch is `agent-gaurdrails`. The compliance harness is in the Part 1 staff agent. Each turn is screened before memory confirmation, retrieval, and MCP. Unsafe model output is replaced and a staged proposal from that turn is voided. The staff knowledge page calls `POST /agent/query` and keeps `conversation_id`. Live model answers and Qdrant search stay unverified.
 
 ## Completed (standing)
 
-- Public site, staff UI, incident CLI, supplier directory, staff JWT auth, error handling, bullet-proof tests, inventory API (HCR-0188).
+- Public site, staff UI, incident CLI, supplier directory, staff JWT auth, error handling, bullet-proof tests, inventory API, inventory backoffice UI, Docker Compose, Web Vitals, serialization, caching, telemetry, clinic-supply pipeline, nightly telemetry export, Redis/Celery message queue, sales-forecast feasibility (unsupported vs seasonal-naive), regression-model evaluation (overfitting; do not stage).
+
+## Completed (this iteration)
+
+- Recorded the knowledge-helper scope and narrowed the API library ban.
+- Copied the four English policy documents into `docs/company-knowledge-base/`.
+- Added `setup` / `embed` in `data/process/rag.py` and `retrieve` / `generate_answer` / `query` in `data/pipelines/rag.py`.
+- Added signed-in `POST /knowledge/query`, the staff page at `/knowledge`, Qdrant in Compose, and `docs/rag/rag-design.md`.
+- The cutter produces 14 pieces: insurance 3, appointments 4, referrals 4, new patients 3. A live Qdrant load has not been run.
+- Added the compiled support-agent map and signed-in `POST /agent/query`. `POST /knowledge/query` still calls `query()`.
+- An empty agent search returns one fixed sentence and does not call the writing model. A Georgia Medicaid trace is saved at `data/eval/agent-trace-example.json`.
+- The latest incident upload now keeps safe rows in the existing store. `patient_id` is dropped. The agent map chooses policy search, one incident read, or both.
+- Added the read-only tool door. The staff token now carries issuer `https://healthcore-api`, audience `healthcore-company-tools`, and scopes `incidents:read inventory:read`. The agent incident step calls `get_incident_status` through that door.
+- Archived the handoff at `memory-bank/archive/2026-11-12-mcp-oauth-tools/mcp-oauth-tools-context.md`.
+- Added user-scoped confirm-before-save memory in `services/api/app/agent/`. Policy search and the incident lookup stay. No staff page and no Celery cleanup job.
+- Archived the handoff at `memory-bank/archive/2026-11-13-agent-memory/agent-memory-context.md`.
+- Added the compliance harness in `services/api/app/agent/harness.py`, with screening before the existing graph, untrusted-data filtering, and one output release check.
+- Pointed the staff knowledge page at `POST /agent/query`. `POST /knowledge/query` still uses the coordinator prompt.
+- Added `uv run python -m app.agent.guard_summary` for sanitized session counts.
+- Archived the handoff at `memory-bank/archive/2026-11-18-agent-gaurdrails/agent-gaurdrails-context.md`.
 
 ## Validation results
 
-HCR-0188 (2026-09-18): 16 inventory pytest passed; 96 full pytest; compileall ok; live seed 6/4/3 gloves 105; live `/docs` + HTTP smoke of evaluator-critical flows. Details in [`TESTING.md`](../TESTING.md).
+- `uv --directory services/api run pytest tests/test_agent_harness.py tests/test_agent.py tests/test_agent_memory.py tests/test_memory_privacy.py tests/test_knowledge.py`: 62 passed, 1 existing deprecation warning.
+- `uv --directory services/api run pytest ../../tests/pipelines/test_agent_graph.py ../../tests/pipelines/test_agent_tools.py`: 12 passed.
+- `uv --directory services/api run pytest`: 263 passed, 1 skipped, 1 existing deprecation warning.
+- `npm test -w uis/web -- --watchAll=false src/components/__tests__/KnowledgeAssistant.test.tsx`: 6 passed. `npm run typecheck -w uis/web` completed with no errors.
+- Staff page in the browser: a signed-in "Hello" rendered the compliance redirect as the answer. The next request to `POST /agent/query` included the returned `conversation_id`. An in-domain referral question reached that route and the page showed the existing sanitized error after HTTP 503, because local search and the writing model are not configured.
+- `uv --directory services/api run python -m app.agent.guard_summary` printed the local session below. It contains codes only.
 
-Part 2 (2026-09-18):
+```json
+{
+  "counts_by_category": {"content": 2, "security": 2, "structural": 0},
+  "counts_by_guard": {
+    "external": {"content": 0, "security": 0, "structural": 0},
+    "intake": {"content": 0, "security": 2, "structural": 0},
+    "output": {"content": 0, "security": 0, "structural": 0},
+    "scope": {"content": 2, "security": 0, "structural": 0}
+  },
+  "session_boundary": "AGENT_GUARD_SESSION plus AGENT_GUARD_LOG",
+  "session_id": "local",
+  "total": 4
+}
+```
 
-- `npm test -w uis/web`: 34 passed, 3 suites (coverage on `apiClient.ts` + `inventory.ts`).
-- `npm run lint -w uis/web`: no ESLint warnings or errors.
-- `npm run build -w uis/web`: success; routes include the four `/backoffice/inventory/...` pages.
-- `npm run typecheck -w uis/web`: passed after abort-mock `RequestInit` typing fix (an earlier run failed only because a concurrent `next build` had wiped `.next/types`).
-- Live smoke (API `:8000`, web `:3001`): unauthenticated `/backoffice/inventory/products` → `/login`; registered staff user; supplies list showed live stock (gloves **105 box / In stock**, wound care humanized); delivery of 2 succeeded and stock became **107**; consumption loaded **107**, overstock warning blocked qty 200; stale-stock submit of 107 after a concurrent outbound 1 returned inline `Insufficient stock for supply 'Nitrile gloves (box of 100)'. Available: 106, requested: 107.` and refreshed stock; successful consumption of 1; history showed Delivery (inbound), Clinical use (outbound), Expiry waste (outbound), `en-GB` dates, `user_uuid`, no edit/delete.
+- Live model answers, Qdrant indexing, Recall@3, and MCP Playground were not run. The local env still has no 4Geeks model ids or key. The configured inventory database was unreachable, so the browser check used a temporary SQLite file.
 
 ## Blockers
 
-- None for Part 2. Supabase MCP SQL still fails password auth; live checks used SQLAlchemy via `.env`.
-
-## Unverified / observed
-
-- Pre-existing AuthGuard hydration overlay (`src/components/AuthProvider.tsx`) appears on hard navigations in Next 15.2.4; dismissed with Escape and did not block the inventory flows. Not fixed in this iteration.
+No 4Geeks model ids or API key are in the local env files. Live model answers, including a live memory proposal from the model, stay unverified until those settings are filled in. The tests use a fake model.
 
 ## Next steps
 
-1. User review / evaluator pass; archive this iteration when asked.
+1. Publishing `agent-gaurdrails` is a separate request. The syllabus branch name is `feature/agent-guardrails`.
+2. When the 4Geeks settings exist, set the two model ids and `RAG_MIN_SCORE`, run `python -m process.rag`, then `python data/eval/recall_at_3.py`. Do not invent those values.
 
 ## Run commands (durable)
 
 ```bash
-cd services/api
-uv sync --group dev
-uv run pytest
-uv run seed-auth
-uv run seed-inventory
-uv run uvicorn app.main:app --reload --port 8000
-
-npm test -w uis/web
-npm run typecheck -w uis/web
-npm run lint -w uis/web
-npm run build -w uis/web
-npm run dev -w uis/web
+uv sync --directory scripts/sales_forecast --group dev
+uv --directory scripts/sales_forecast run pytest
+uv --directory scripts/sales_forecast run python ../train_sales_forecast.py
+uv --directory scripts/sales_forecast run python ../eval_sales_forecast.py
+cd services/api && uv run pytest
+uv --directory mcps/healthcore-company-tools run pytest
+services/api/.venv/bin/python -m pytest tests/pipelines/test_rag.py
+uv --directory services/api run pytest ../../tests/pipelines/test_agent_graph.py ../../tests/pipelines/test_agent_tools.py
+uv --directory services/api run python ../../data/process/rag.py
+uv --directory services/api run python ../../data/eval/recall_at_3.py
+python3 data/pipelines/pipeline.py
+./services/api/.venv/bin/python scripts/nightly_export.py
+docker compose up --build
 ```
 
-Last updated: 2026-09-18
+Last updated: 2026-11-18

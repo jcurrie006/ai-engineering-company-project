@@ -6,6 +6,7 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { SupplySelect } from "@/components/inventory/SupplySelect";
 import { toUserMessage } from "@/lib/apiClient";
 import { CLINIC_IDS, createDelivery, isClinicId, listSupplies, type MedicalSupply } from "@/lib/inventory";
+import { inventoryProperties, track } from "@/lib/telemetry";
 
 export function SupplyDeliveryForm() {
   const searchParams = useSearchParams();
@@ -16,6 +17,7 @@ export function SupplyDeliveryForm() {
   const [preselectNote, setPreselectNote] = useState<string | null>(null);
   const [supplyId, setSupplyId] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [unitCost, setUnitCost] = useState("");
   const [vendorName, setVendorName] = useState("");
   const [clinicId, setClinicId] = useState("1");
   const [submitting, setSubmitting] = useState(false);
@@ -51,13 +53,49 @@ export function SupplyDeliveryForm() {
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     const qty = Number(quantity);
+    const cost = Number(unitCost);
+    const clinic = Number(clinicId);
+    const selected = supplies.find((row) => String(row.id) === supplyId);
     if (!Number.isInteger(qty) || qty < 1) {
+      track("inbound_order_validation_failed", {
+        ...inventoryProperties({
+          clinic_id: isClinicId(clinic) ? clinic : 1,
+          country: selected?.country ?? "US",
+          product_id: selected?.id ?? supplyId ?? "unknown",
+          category: selected?.category ?? "consumable",
+          quantity: Number.isFinite(qty) ? qty : 0,
+        }),
+        reason: "invalid_quantity",
+      });
       setFormError("Enter a positive whole-number quantity.");
       return;
     }
-    const clinic = Number(clinicId);
     if (!isClinicId(clinic)) {
+      track("inbound_order_validation_failed", {
+        ...inventoryProperties({
+          clinic_id: 1,
+          country: selected?.country ?? "US",
+          product_id: selected?.id ?? supplyId ?? "unknown",
+          category: selected?.category ?? "consumable",
+          quantity: qty,
+        }),
+        reason: "invalid_clinic",
+      });
       setFormError("Clinic must be between 1 and 12.");
+      return;
+    }
+    if (!Number.isFinite(cost) || cost <= 0) {
+      track("inbound_order_validation_failed", {
+        ...inventoryProperties({
+          clinic_id: clinic,
+          country: selected?.country ?? "US",
+          product_id: selected?.id ?? supplyId ?? "unknown",
+          category: selected?.category ?? "consumable",
+          quantity: qty,
+        }),
+        reason: "invalid_unit_cost",
+      });
+      setFormError("Enter a unit cost greater than zero.");
       return;
     }
     setSubmitting(true);
@@ -70,8 +108,22 @@ export function SupplyDeliveryForm() {
         vendor_name: vendorName.trim(),
         clinic_id: clinic,
       });
+      if (selected) {
+        track(
+          "inbound_order_created",
+          inventoryProperties({
+            clinic_id: clinic,
+            country: selected.country,
+            product_id: selected.id,
+            category: selected.category,
+            quantity: qty,
+            unit_cost: cost,
+          }),
+        );
+      }
       setSuccess("Delivery recorded.");
       setQuantity("");
+      setUnitCost("");
       setVendorName("");
       setClinicId("1");
       setSupplyId(requestedId && supplies.some((row) => String(row.id) === requestedId) ? requestedId : "");
@@ -125,6 +177,23 @@ export function SupplyDeliveryForm() {
             onChange={(event) => setQuantity(event.target.value)}
             disabled={submitting}
           />
+        </label>
+        <label className="block text-sm text-slate-700" htmlFor="unit_cost">
+          Unit cost
+          <input
+            id="unit_cost"
+            type="number"
+            min={0}
+            step="0.01"
+            required
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-2"
+            value={unitCost}
+            onChange={(event) => setUnitCost(event.target.value)}
+            disabled={submitting}
+          />
+          <span className="mt-1 block text-xs text-slate-500">
+            Supply cost per unit in the clinic currency (USD for US, GBP for UK). Not converted.
+          </span>
         </label>
         <label className="block text-sm text-slate-700" htmlFor="vendor_name">
           Vendor name

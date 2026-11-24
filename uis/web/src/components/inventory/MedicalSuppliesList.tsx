@@ -1,33 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { StockBadge } from "@/components/inventory/StockBadge";
-import { toUserMessage } from "@/lib/apiClient";
-import { categoryLabel, listSupplies, type MedicalSupply } from "@/lib/inventory";
+import { categoryLabel, listSupplies } from "@/lib/inventory";
+import { useAsyncResource } from "@/lib/useAsyncResource";
+import { inventoryProperties, track } from "@/lib/telemetry";
 
 export function MedicalSuppliesList() {
-  const [supplies, setSupplies] = useState<MedicalSupply[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setSupplies(await listSupplies());
-    } catch (err) {
-      setError(toUserMessage(err));
-      setSupplies([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { data, error, loading, reload } = useAsyncResource(listSupplies);
+  const supplies = data ?? [];
+  const [rejectNote, setRejectNote] = useState<string | null>(null);
 
   return (
     <div className="space-y-6">
@@ -37,7 +21,12 @@ export function MedicalSuppliesList() {
           Live catalogue stock is computed by the inventory API (deliveries minus consumption).
         </p>
       </div>
-      {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
+      {error ? <ErrorBanner message={error} onRetry={() => void reload()} /> : null}
+      {rejectNote ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="status">
+          {rejectNote}
+        </p>
+      ) : null}
       <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
@@ -98,6 +87,27 @@ export function MedicalSuppliesList() {
                       >
                         Record consumption
                       </Link>
+                      <button
+                        type="button"
+                        className="rounded-md border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        onClick={() => {
+                          track(
+                            "direct_stock_edit_rejected",
+                            inventoryProperties({
+                              clinic_id: 1,
+                              country: supply.country,
+                              product_id: supply.id,
+                              category: supply.category,
+                              quantity: supply.current_stock,
+                            }),
+                          );
+                          setRejectNote(
+                            "Stock can only change through inbound or outbound orders. Direct edits are rejected.",
+                          );
+                        }}
+                      >
+                        Adjust stock
+                      </button>
                     </div>
                   </td>
                 </tr>
